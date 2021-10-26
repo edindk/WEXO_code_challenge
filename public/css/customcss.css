@@ -1,0 +1,12 @@
+body {
+    background-color: white !important;
+}
+
+.backdrop__gradient {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: linear-gradient(to top, black 40%, transparent);
+}
