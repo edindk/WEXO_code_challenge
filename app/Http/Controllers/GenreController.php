@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Genre;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Session;
 
 class GenreController extends Controller
 {
+
     /**
      * @param $programType
      * @return array
@@ -14,10 +16,10 @@ class GenreController extends Controller
      */
     function retrieve_all_byProgramType($programType)
     {
-        $arrOfGenres = [];
+        $arr = [];
 
         $client = new \GuzzleHttp\Client();
-        $response = $client->request('GET', 'https://feed.entertainment.tv.theplatform.eu/f/jGxigC/bb-all-pas?form=json&lang=da&byProgramType=' . $programType);
+        $response = $client->request('GET', 'https://feed.entertainment.tv.theplatform.eu/f/jGxigC/bb-all-pas?form=json&lang=da&byProgramType=' . $programType . '&fields=tags');
         $contents = $response->getBody()->getContents();
 
         $decoded = json_decode($contents, true);
@@ -27,54 +29,75 @@ class GenreController extends Controller
             $tags = $entryValue['plprogram$tags'];
             if (is_array($tags)) {
                 foreach ($tags as $tagKey => $tagValue) {
-                    array_push($arrOfGenres, $tagValue['plprogram$title']);
+                    array_push($arr, $tagValue['plprogram$title']);
                 }
             }
         }
-        return $arrOfGenres;
+        return $arr;
     }
 
     /**
-     * @return array
+     * @return array|mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    function combine_movies_and_series()
+    function combine_movies_and_series_for_all_genres()
     {
-        $arrOfMovieGenres = $this->retrieve_all_byProgramType('movie');
-        $arrOfSeriesGenres = $this->retrieve_all_byProgramType('series');
+        $arrOfAllGenresObjs = [];
 
-        $mergedArr = array_merge($arrOfMovieGenres, $arrOfSeriesGenres);
-        $uniqueArr = array_unique($mergedArr);
+        if (Session::get('arrOfAllGenresObjs')) {
+            $arrOfAllGenresObjs = Session::get('arrOfAllGenresObjs');
+        } else {
+            $arrOfMovieGenres = $this->retrieve_all_byProgramType('movie');
+            $arrOfSeriesGenres = $this->retrieve_all_byProgramType('series');
 
-        return array_values($uniqueArr);
+            $mergedArr = array_merge($arrOfMovieGenres, $arrOfSeriesGenres);
+            $uniqueArr = array_unique($mergedArr);
+
+            $arrOfAllGenresObjs = $this->create_genre_objs(array_values($uniqueArr));
+
+            Session::put('arrOfAllGenresObjs', $arrOfAllGenresObjs);
+        }
+
+        return $arrOfAllGenresObjs;
     }
+
 
     /**
      * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    function create_genre_obj()
+    function show_homepage()
     {
-        $arrOfGenres = $this->combine_movies_and_series();
-        $arrOfGenreObj = [];
+        $arrOfAllGenres = $this->combine_movies_and_series_for_all_genres();
+        return view('homepage', ['genres' => $arrOfAllGenres]);
+    }
 
-        for ($i = 0; $i < count($arrOfGenres); $i++) {
+    /**
+     * @param $arr
+     * @return array
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    function create_genre_objs($arr)
+    {
+        $arrOfGenreObjs = [];
+        for ($i = 0; $i < count($arr); $i++) {
             $client = new \GuzzleHttp\Client();
-            $response = $client->request('GET', 'https://feed.entertainment.tv.theplatform.eu/f/jGxigC/bb-all-pas?form=json&byTags=genre:' . $arrOfGenres[$i]);
+            $response = $client->request('GET', 'https://feed.entertainment.tv.theplatform.eu/f/jGxigC/bb-all-pas?form=json&byTags=genre:' . $arr[$i]);
             $contents = $response->getBody()->getContents();
             $decoded = json_decode($contents, true);
 
             if (isset($decoded['entryCount'])) {
                 if ($decoded['entryCount'] != 0) {
                     $genreObj = new Genre([
-                        'genreTitle' => $arrOfGenres[$i],
+                        'genreTitle' => $arr[$i],
                         'numbOfTitles' => $decoded['entryCount']
                     ]);
-                    array_push($arrOfGenreObj, $genreObj);
+                    array_push($arrOfGenreObjs, $genreObj);
                 }
             }
         }
-        return view('homepage', ['genres' => $arrOfGenreObj]);
+
+        return $arrOfGenreObjs;
     }
 
 }

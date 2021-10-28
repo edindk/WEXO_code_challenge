@@ -21,7 +21,7 @@
         <div class="row justify-content-md-center">
             @foreach($genres as $genre)
                 <div class="col">
-                    <a href="http://127.0.0.1:8000/movies-and-series/{{$genre->genreTitle}}">
+                    <a href="http://127.0.0.1:8000/movies-and-series/{{$genre->genreTitle}}/range=1-20">
                         <button type="button" class="btn btn-primary">{{$genre->genreTitle}} ({{$genre->numbOfTitles}})</button>
                     </a>
                 </div>

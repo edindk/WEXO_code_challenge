@@ -27,7 +27,7 @@
                     <a href="http://127.0.0.1:8000/movie/{{$movie->id}}">
                         <button type="button" class="btn btn-primary w-15">Vis mere</button>
                     </a>
-                    <button type="button" class="btn btn-success w-15">+ Ønskeliste</button>
+                    <a href="http://127.0.0.1:8000/addtowishlist/{{$movie->id}}"><button type="button" class="btn btn-success w-15">+ Ønskeliste</button></a>
                 </div>
             </div>
         @endforeach

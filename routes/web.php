@@ -15,7 +15,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', [GenreController::class, 'create_genre_obj']);
-Route::get('/movies-and-series/{genre}', [MovieAndSeriesController::class, 'show_by_genre']);
-Route::get('movie/{id}', [MovieAndSeriesController::class, 'show_movie']);
-Route::get('showall/{genre}', [MovieAndSeriesController::class, 'show_all']);
+Route::get('/', [GenreController::class, 'show_homepage']);
+Route::get('movies-and-series/{genre}/{range?}', [MovieAndSeriesController::class, 'show_by_genre']);
+Route::get('movie/{id}', [MovieAndSeriesController::class, 'show_movie_info']);
+Route::get('showall/{genre}', [MovieAndSeriesController::class, 'show_by_genre']);
+Route::get('wishlist', [MovieAndSeriesController::class, 'show_wishlist']);
+Route::get('addtowishlist/{id}', [MovieAndSeriesController::class, 'add_to_wishlist']);
+

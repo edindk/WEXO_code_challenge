@@ -20,7 +20,7 @@
             </div>
             <div class="col-lg-5">
                 <h3 class="mb-0 mt-2">{{$movie->movieTitle}}</h3>
-                <p>Genre: {{$movie->genre}} / Udgivelsesår: {{$movie->releaseYear}}</p>
+                <p>Genre: {{$movie->genre[0]['plprogram$title']}} / Udgivelsesår: {{$movie->releaseYear}}</p>
                 <h4>Beskrivelse</h4>
                 <p>{{$movie->description}}</p>
                 <h4>Medvirkende</h4>
@@ -29,7 +29,7 @@
 
                         <div class="col-sm-2">
                             <p class="mb-0">{{$p['plprogram$personName']}}</p>
-                            <p class="text-center">{{$p['plprogram$creditType']}}</p>
+                            <p>{{$p['plprogram$creditType']}}</p>
                         </div>
                     @endforeach
                 </div>

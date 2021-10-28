@@ -5,39 +5,37 @@ namespace App\Http\Controllers;
 use App\Models\Movie;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Session;
+use function PHPUnit\Framework\isEmpty;
 
 class MovieAndSeriesController extends Controller
 {
     /**
-     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
-     */
-    function show_by_genre($genre)
-    {
-        $allMovies = $this->combine_movies_and_series($genre, '');
-        Session::put('moviesAndSeriesByGenre', $allMovies);
-
-        $arr = $this->combine_movies_and_series($genre, '&range=1-20');
-
-        return view('showbygenre', ['movies' => $arr, 'genre' => $genre]);
-    }
-
-    /**
-     * @param $genre
+     * @param string $genre
      * @param $programType
-     * @param $range
+     * @param string $range
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    function retrieve_by_genre($genre, $programType, $range)
+    function get_movies_and_series_by_genre_and_range($genre = '', $programType, $range = '')
     {
-        $arr = [];
-
         $client = new \GuzzleHttp\Client();
-        $response = $client->request('GET', 'https://feed.entertainment.tv.theplatform.eu/f/jGxigC/bb-all-pas?form=json' . $range . '&byTags=genre:' . $genre . '&byYear=2017&byProgramType=' . $programType);
+        $response = $client->request('GET', 'https://feed.entertainment.tv.theplatform.eu/f/jGxigC/bb-all-pas?form=json&' . $range . '&byTags=genre:' . $genre . '&byProgramType=' . $programType);
         $contents = $response->getBody()->getContents();
 
         $decoded = json_decode($contents, true);
         $entry = $decoded['entries'];
+
+        return $this->create_movie_objs($entry);
+    }
+
+
+    /**
+     * @param $entry
+     * @return array
+     */
+    function create_movie_objs($entry)
+    {
+        $arrOfMovieObjs = [];
 
         foreach ($entry as $entryKey => $entryValue) {
             $thumbnailArr = $entryValue['plprogram$thumbnails'];
@@ -52,30 +50,32 @@ class MovieAndSeriesController extends Controller
                 'movieTitle' => $entryValue['title'],
                 'description' => $entryValue['description'],
                 'releaseYear' => $entryValue['plprogram$year'],
-                'genre' => $genre,
+                'genre' => $entryValue['plprogram$tags'],
                 'credits' => $entryValue['plprogram$credits']
             ]);
-            array_push($arr, $movieObj);
+
+            array_push($arrOfMovieObjs, $movieObj);
         }
-        return $arr;
+        return $arrOfMovieObjs;
     }
 
+
     /**
-     * @param $genre
-     * @param $range
+     * @param string $genre
+     * @param string $range
      * @return array
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    function combine_movies_and_series($genre, $range)
+    function combine_movies_and_series($genre = '', $range = '')
     {
-        $arrOfMovies = $this->retrieve_by_genre($genre, 'movie', $range);
-        $arrOfSeries = $this->retrieve_by_genre($genre, 'series', $range);
+        $arrOfMovies = $this->get_movies_and_series_by_genre_and_range($genre, 'movie', $range);
+        $arrOfSeries = $this->get_movies_and_series_by_genre_and_range($genre, 'series', $range);
 
         $mergedArr = array_merge($arrOfMovies, $arrOfSeries);
         $uniqueArr = array_unique($mergedArr);
-
         return array_values($uniqueArr);
     }
+
 
     /**
      * @param $thumbnailArr
@@ -106,34 +106,88 @@ class MovieAndSeriesController extends Controller
      */
     function get_image($thumbnailArr)
     {
+        $dummyImg = 'https://dummyimage.com/250x364/000/fff.jpg&text=Not+found';
         $client = new \GuzzleHttp\Client();
-        foreach ($thumbnailArr as $thumbnailKey => $thumbnailValue) {
-            try {
+
+        if (empty($thumbnailArr)) {
+            return $dummyImg;
+        } else {
+            foreach ($thumbnailArr as $thumbnailKey => $thumbnailValue) {
                 $imgUrl = $thumbnailValue['plprogram$url'];
-                $client->request('GET', $imgUrl);
-                return $imgUrl;
-            } catch (\Exception $e) {
-                return 'https://dummyimage.com/250x364/000/fff.jpg&text=Not+found';
+                try {
+                    $client->request('GET', $imgUrl);
+                    return $imgUrl;
+                } catch (\Exception $e) {
+                    return $dummyImg;
+                }
             }
         }
+
+    }
+
+
+    /**
+     * @param $genre
+     * @param string $range
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    function show_by_genre($genre, $range = '')
+    {
+        $arrOfMovieObjs = $this->combine_movies_and_series($genre, $range);
+        return view('showbygenre', ['movies' => $arrOfMovieObjs, 'genre' => $genre]);
+    }
+
+    /**
+     * @param $id
+     * @return Movie
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    function get_single_movie_by_id($id)
+    {
+        $client = new \GuzzleHttp\Client();
+
+        $response = $client->request('GET', 'https://feed.entertainment.tv.theplatform.eu/f/jGxigC/bb-all-pas/' . $id . '?form=json');
+        $contents = $response->getBody()->getContents();
+
+        $decoded = json_decode($contents, true);
+
+        return $this->create_single_movie_obj($decoded);
     }
 
     /**
      * @param $id
      * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    function show_movie($id)
+    function show_movie_info($id)
     {
-        $arr = Session::get('moviesAndSeriesByGenre');
-        $movie = null;
-
-        foreach ($arr as $movieKey => $movieValue) {
-            if ($movieValue->id == $id) {
-                $movie = $movieValue;
-                break;
-            }
-        }
+        $movie = $this->get_single_movie_by_id($id);
         return view('movieinfo', ['movie' => $movie]);
+    }
+
+    /**
+     * @param $entry
+     * @return Movie
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    function create_single_movie_obj($entry)
+    {
+        $thumbnailArr = $entry['plprogram$thumbnails'];
+        $img = $this->get_image($thumbnailArr);
+        $bgCover = $this->get_cover($thumbnailArr);
+        $id = preg_replace("/[^0-9]/", "", $entry['id']);
+
+        return new Movie([
+            'img' => $img,
+            'id' => $id,
+            'bgCover' => $bgCover,
+            'movieTitle' => $entry['title'],
+            'description' => $entry['description'],
+            'releaseYear' => $entry['plprogram$year'],
+            'genre' => $entry['plprogram$tags'],
+            'credits' => $entry['plprogram$credits']
+        ]);
     }
 
     /**
@@ -144,5 +198,37 @@ class MovieAndSeriesController extends Controller
     {
         $arr = Session::get('moviesAndSeriesByGenre');
         return view('showall', ['movies' => $arr, 'genre' => $genre]);
+    }
+
+    /**
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+     */
+    function show_wishlist()
+    {
+        $wishlist = Session::get('wishlist');
+        return view('wishlist', ['wishlist' => $wishlist]);
+    }
+
+    /**
+     * @param $id
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    function add_to_wishlist($id)
+    {
+        $movie = $this->get_single_movie_by_id($id);
+
+        $wishlist = [];
+
+        if (Session::get('wishlist')) {
+            $wishlist = Session::get('wishlist');
+            array_push($wishlist, $movie);
+            Session::forget('wishlist');
+        } else {
+            array_push($wishlist, $movie);
+        }
+        Session::put('wishlist', $wishlist);
+
+        return view('wishlist', ['wishlist' => $wishlist]);
     }
 }
